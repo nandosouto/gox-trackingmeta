@@ -269,7 +269,16 @@ def goxgain_webhook():
         if utm_params:
             event_source_url = build_url_with_utm(event_source_url, utm_params)
             logger.info(f"URL enriquecida com UTMs: {event_source_url}")
-        
+            
+        # Função helper para mesclar UTMs no custom_data
+        def get_custom_data_with_utm(base_data, utms):
+            if not utms:
+                return base_data
+            # Adiciona UTMs ao custom_data (sem sobrescrever chaves existentes se não quiser, mas aqui vamos adicionar)
+            for k, v in utms.items():
+                base_data[k] = v
+            return base_data
+
         event_time = payload.get('time') # Milissegundos
         event_id_unique = str(uuid.uuid4())
 
@@ -282,6 +291,9 @@ def goxgain_webhook():
                 'value': 0.0,
                 'content_name': 'Registration'
             }
+            # Adiciona UTMs
+            custom_data = get_custom_data_with_utm(custom_data, utm_params)
+            
             # Evento Principal: CompleteRegistration
             send_event_to_meta('CompleteRegistration', user_data, custom_data, event_source_url, event_id=event_id_unique, event_time=event_time)
             
@@ -291,6 +303,7 @@ def goxgain_webhook():
                 'value': 0.0,
                 'content_name': 'Registration Success Page'
             }
+            vc_data = get_custom_data_with_utm(vc_data, utm_params)
             send_event_to_meta('ViewContent', user_data, vc_data, event_source_url, event_id=str(uuid.uuid4()), event_time=event_time)
             
         # 2. Login: "login" -> Lead + ViewContent
@@ -300,6 +313,8 @@ def goxgain_webhook():
                 'value': 0.0,
                 'content_name': 'Login'
             }
+            custom_data = get_custom_data_with_utm(custom_data, utm_params)
+            
             # Evento Principal: Lead
             send_event_to_meta('Lead', user_data, custom_data, event_source_url, event_id=event_id_unique, event_time=event_time)
 
@@ -309,6 +324,7 @@ def goxgain_webhook():
                 'value': 0.0,
                 'content_name': 'Login Page View'
             }
+            vc_data = get_custom_data_with_utm(vc_data, utm_params)
             send_event_to_meta('ViewContent', user_data, vc_data, event_source_url, event_id=str(uuid.uuid4()), event_time=event_time)
             
         # 3. Criação de Depósito: "deposit_created" -> InitiateCheckout E AddToCart
@@ -325,6 +341,7 @@ def goxgain_webhook():
                 'content_type': 'product',
                 'content_name': 'Deposit Created'
             }
+            atc_data = get_custom_data_with_utm(atc_data, utm_params)
             send_event_to_meta('AddToCart', user_data, atc_data, event_source_url, event_id=str(uuid.uuid4()), event_time=event_time)
             
             # --- InitiateCheckout ---
@@ -335,6 +352,7 @@ def goxgain_webhook():
                 'content_type': 'product',
                 'num_items': 1
             }
+            ic_data = get_custom_data_with_utm(ic_data, utm_params)
             send_event_to_meta('InitiateCheckout', user_data, ic_data, event_source_url, event_id=event_id_unique, event_time=event_time)
             
         # 4. Depósito Pago: "deposit_paid" -> Purchase
@@ -350,6 +368,7 @@ def goxgain_webhook():
                 'content_type': 'product',
                 'content_name': 'Deposit Paid'
             }
+            purchase_data = get_custom_data_with_utm(purchase_data, utm_params)
             
             send_event_to_meta('Purchase', user_data, purchase_data, event_source_url, event_id=event_id_unique, event_time=event_time)
             
