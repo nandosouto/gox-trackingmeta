@@ -5,6 +5,7 @@ import requests
 from flask import Flask, request, jsonify
 import logging
 import uuid
+from urllib.parse import urlparse, urlencode, parse_qs
 import json
 
 # Configuração de logging
@@ -169,6 +170,78 @@ def prepare_user_data(payload, request_obj):
     
     return user_data
 
+def extract_utm_parameters(payload):
+    """Extrai todos os parâmetros UTM do payload."""
+    utm_params = {}
+    
+    # Lista de parâmetros UTM padrão
+    utm_keys = [
+        'utm_source', 'utm_medium', 'utm_campaign', 
+        'utm_term', 'utm_content', 'utm_id', 'utm_source_platform'
+    ]
+    
+    # Tenta extrair UTM do payload diretamente
+    for key in utm_keys:
+        value = payload.get(key)
+        if value:
+            utm_params[key] = str(value)
+    
+    # Tenta extrair de um objeto utm se existir
+    utm_object = payload.get('utm', {})
+    if isinstance(utm_object, dict):
+        for key in utm_keys:
+            value = utm_object.get(key)
+            if value:
+                utm_params[key] = str(value)
+    
+    # Tenta extrair de um objeto tracking se existir
+    tracking_object = payload.get('tracking', {})
+    if isinstance(tracking_object, dict):
+        for key in utm_keys:
+            value = tracking_object.get(key)
+            if value:
+                utm_params[key] = str(value)
+    
+    # Tenta extrair de query_params se existir
+    query_params = payload.get('query_params', {})
+    if isinstance(query_params, dict):
+        for key in utm_keys:
+            value = query_params.get(key)
+            if value:
+                utm_params[key] = str(value)
+    
+    logger.info(f"UTM parameters extraídos: {utm_params}")
+    return utm_params
+
+def build_url_with_utm(base_url, utm_params):
+    """Constrói uma URL completa com parâmetros UTM."""
+    if not base_url:
+        return base_url
+    if not utm_params:
+        return base_url
+    
+    try:
+        # Parse da URL base
+        parsed = urlparse(str(base_url))
+        
+        # Adiciona UTM parameters aos query parameters existentes
+        query_params = parse_qs(parsed.query)
+        for key, value in utm_params.items():
+            query_params[key] = [value]
+        
+        # Reconstrói a URL com os novos parâmetros
+        new_query = urlencode(query_params, doseq=True)
+        new_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        if new_query:
+            new_url += f"?{new_query}"
+        if parsed.fragment:
+            new_url += f"#{parsed.fragment}"
+        
+        return new_url
+    except Exception as e:
+        logger.warning(f"Erro ao construir URL com UTM: {e}. Retornando URL original.")
+        return base_url
+
 app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
@@ -188,7 +261,14 @@ def goxgain_webhook():
         user_data = prepare_user_data(payload, request)
         
         # Como Goxgain não envia a URL da página no payload, podemos deixar vazio ou por a home
-        event_source_url = "https://goxgain.com" # Placeholder ou deixar None
+        event_source_url = "https://goxgain.com" 
+        
+        # --- UTM ENRICHMENT ---
+        # Garante que UTMs soltas no JSON sejam incorporadas à URL para o Meta ler
+        utm_params = extract_utm_parameters(payload)
+        if utm_params:
+            event_source_url = build_url_with_utm(event_source_url, utm_params)
+            logger.info(f"URL enriquecida com UTMs: {event_source_url}")
         
         event_time = payload.get('time') # Milissegundos
         event_id_unique = str(uuid.uuid4())
