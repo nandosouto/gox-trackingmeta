@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: goxgain-meta-webhook
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      # IMPORTANTE: Configure as seguintes variáveis de ambiente no painel do Render:
+      # - META_PIXEL_ID: 1243109087705550
+      # - META_ACCESS_TOKEN: EAAKe1WkmnOsBQggUezSYTaXiVcfAPbjdqZASeXCFU0ZCetJHfV0SqocOgECbZBJrKtSR1yaY7B1uZBLhYcddrrCSnMA7dwe5QrQlAIzqxmcFLzoT5ln5wiAvHlD6tPLrsupCxCfG57YODU5OKqIV8pZCjiaxAEIZBZAWljoQtlDnFOZBXxUGoiQ3rRJY5JzGSQZDZD
+      # Vá em: Settings > Environment > Add Environment Variable
